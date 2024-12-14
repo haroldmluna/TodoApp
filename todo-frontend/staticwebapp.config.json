@@ -1,6 +1,18 @@
 {
     "routes": [
       {
+        "route": "/login",
+        "serve": "/index.html"
+      },
+      {
+        "route": "/register",
+        "serve": "/index.html"
+      },
+      {
+        "route": "/todos",
+        "serve": "/index.html"
+      },
+      {
         "route": "/*",
         "serve": "/index.html",
         "statusCode": 200
