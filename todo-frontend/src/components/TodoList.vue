@@ -2,7 +2,7 @@
   <div class="todo-app">
     <!-- Header Section -->
     <header class="header">
-      <h2>Welcome, {{ username }}</h2>
+      <h2>Welcome, {{ username }}</h2> <!-- Display username here -->
       <button @click="logout" class="btn logout-btn">Logout</button>
     </header>
 
@@ -45,102 +45,109 @@
   </div>
 </template>
 
-<script>
-import axios from "axios";
-import * as signalR from "@microsoft/signalr";
-import { API_BASE_URL } from "../config";
+<script setup>
+import { ref, onMounted, onBeforeUnmount } from 'vue'; // Import Vue Composition API functions
+import axios from 'axios';
+import { useRouter } from 'vue-router'; // Use Vue Router for navigation
+import * as signalR from '@microsoft/signalr';
+import { API_BASE_URL } from '../config';
 
-export default {
-  data() {
-    return {
-      todos: [], // List of todos
-      newTask: "", // New task input
-      username: "", // Current username
-      connection: null, // SignalR connection
-    };
-  },
-  async created() {
-    this.username = localStorage.getItem("username") || "Guest"; // Get username from localStorage
-    await this.fetchTodos();
+const router = useRouter(); // Vue Router instance for navigation
+const username = ref(localStorage.getItem('username') || 'Guest'); // Ref to store the username
+const todos = ref([]); // Ref to store the todo list
+const newTask = ref(''); // Ref for the new task input
+let connection = null; // SignalR connection
 
-    // Initialize SignalR connection
-    this.connection = new signalR.HubConnectionBuilder()
-      .withUrl("https://todoapp-backend-harold.azurewebsites.net") // Use your backend URL here
-      .build();
-
-    // Listen for real-time updates
-    this.connection.on("todos-updated", async () => {
-      await this.fetchTodos(); // Fetch updated todos
+// Fetch the todos from the backend
+const fetchTodos = async () => {
+  const token = localStorage.getItem('token');
+  try {
+    const response = await axios.get(`${API_BASE_URL}/todos/1`, {
+      headers: { Authorization: `Bearer ${token}` },
     });
-
-    try {
-      await this.connection.start(); // Start the SignalR connection
-      console.log("SignalR connection established.");
-    } catch (err) {
-      console.error("Error establishing SignalR connection:", err);
-    }
-  },
-  beforeDestroy() {
-    // Stop the SignalR connection when the component is destroyed
-    if (this.connection) {
-      this.connection.stop();
-    }
-  },
-  methods: {
-    async fetchTodos() {
-      const token = localStorage.getItem("token");
-      try {
-        const response = await axios.get(`${API_BASE_URL}/todos/1`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        this.todos = response.data;
-      } catch (err) {
-        console.error("Error fetching todos:", err);
-      }
-    },
-    async addTodo() {
-      const token = localStorage.getItem("token");
-      try {
-        await axios.post(
-          `${API_BASE_URL}/todos`,
-          { userId: 1, task: this.newTask },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        this.newTask = ""; // Reset task input field
-        await this.fetchTodos(); // Fetch updated todos after adding
-      } catch (err) {
-        console.error("Error adding todo:", err);
-      }
-    },
-    async markAsCompleted(id) {
-      const token = localStorage.getItem("token");
-      try {
-        await axios.put(`${API_BASE_URL}/todos/${id}`, {}, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        await this.fetchTodos(); // Fetch updated todos after marking as completed
-      } catch (err) {
-        console.error("Error marking todo as completed:", err);
-      }
-    },
-    async deleteTodo(id) {
-      const token = localStorage.getItem("token");
-      try {
-        await axios.delete(`${API_BASE_URL}/todos/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        await this.fetchTodos(); // Fetch updated todos after deletion
-      } catch (err) {
-        console.error("Error deleting todo:", err);
-      }
-    },
-    logout() {
-      localStorage.removeItem("token");
-      localStorage.removeItem("username");
-      window.location.reload(); // Refresh the page after logout
-    },
-  },
+    todos.value = response.data;
+  } catch (err) {
+    console.error('Error fetching todos:', err);
+  }
 };
+
+// Add a new todo
+const addTodo = async () => {
+  const token = localStorage.getItem('token');
+  try {
+    await axios.post(
+      `${API_BASE_URL}/todos`,
+      { userId: 1, task: newTask.value },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    newTask.value = ''; // Reset input field
+    await fetchTodos(); // Fetch updated todos after adding
+  } catch (err) {
+    console.error('Error adding todo:', err);
+  }
+};
+
+// Mark todo as completed
+const markAsCompleted = async (id) => {
+  const token = localStorage.getItem('token');
+  try {
+    await axios.put(`${API_BASE_URL}/todos/${id}`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    await fetchTodos(); // Fetch updated todos after marking as completed
+  } catch (err) {
+    console.error('Error marking todo as completed:', err);
+  }
+};
+
+// Delete a todo
+const deleteTodo = async (id) => {
+  const token = localStorage.getItem('token');
+  try {
+    await axios.delete(`${API_BASE_URL}/todos/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    await fetchTodos(); // Fetch updated todos after deletion
+  } catch (err) {
+    console.error('Error deleting todo:', err);
+  }
+};
+
+// Logout the user
+const logout = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('username');
+  router.push('/login'); // Redirect to the login page after logout
+};
+
+// Setup SignalR connection to listen for real-time updates
+onMounted(async () => {
+  connection = new signalR.HubConnectionBuilder()
+    .withUrl('https://todoapp-backend-harold.azurewebsites.net') // Your backend URL
+    .build();
+
+  // Listen for todos-updated event to refresh the todo list
+  connection.on('todos-updated', async () => {
+    await fetchTodos(); // Fetch updated todos
+  });
+
+  try {
+    await connection.start(); // Start the SignalR connection
+    console.log('SignalR connection established.');
+  } catch (err) {
+    console.error('Error establishing SignalR connection:', err);
+  }
+});
+
+// Cleanup SignalR connection when the component is destroyed
+onBeforeUnmount(() => {
+  if (connection) {
+    connection.stop();
+  }
+});
+
+// Fetch todos when the component is mounted
+fetchTodos();
 </script>
 
 <style scoped>
