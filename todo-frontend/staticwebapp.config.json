@@ -1,6 +1,7 @@
 {
     "navigationFallback": {
-      "rewrite": "/index.html"
+      "rewrite": "/index.html",
+      "exclude": ["/images/*", "/css/*", "/js/*"] 
     },
     "routes": [
       {
@@ -9,6 +10,14 @@
       },
       {
         "route": "/register",
+        "rewrite": "/index.html"
+      },
+      {
+        "route": "/todos",
+        "rewrite": "/index.html"
+      },
+      {
+        "route": "/",
         "rewrite": "/index.html"
       }
     ]
